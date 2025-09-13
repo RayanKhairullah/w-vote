@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('import_logs', function (Blueprint $table) {
             $table->id();
-            $table->unsignedInteger('admin_id')->nullable();
+            $table->unsignedBigInteger('admin_id')->nullable();
             $table->string('filename', 255)->nullable();
             $table->unsignedInteger('total_records')->default(0);
             $table->unsignedInteger('inserted')->default(0);
