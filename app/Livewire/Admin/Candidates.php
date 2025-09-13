@@ -7,6 +7,7 @@ use App\Models\CandidateElection;
 use App\Models\Election;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Storage;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Layout;
@@ -32,6 +33,13 @@ class Candidates extends Component
     public ?int $assignCandidateId = null;
     public ?int $assignBallotNumber = null;
 
+    // Deletion confirmation modal state
+    public bool $confirmingDeletion = false;
+    public ?int $candidateIdToDelete = null;
+
+    // Form modal state
+    public bool $showFormModal = false;
+
     public function mount(): void
     {
         abort_unless(Auth::check(), 403);
@@ -49,6 +57,12 @@ class Candidates extends Component
         $this->mission = null;
     }
 
+    public function openCreate(): void
+    {
+        $this->resetForm();
+        $this->showFormModal = true;
+    }
+
     public function edit(int $id): void
     {
         $c = Candidate::findOrFail($id);
@@ -59,6 +73,7 @@ class Candidates extends Component
         $this->photo_path = $c->photo_path;
         $this->vision = $c->vision;
         $this->mission = $c->mission;
+        $this->showFormModal = true;
     }
 
     public function save(): void
@@ -103,13 +118,33 @@ class Candidates extends Component
         }
 
         $this->resetForm();
-        session()->flash('success', 'Candidate saved');
+        $this->dispatch('toast', message: 'Kandidat disimpan', type: 'success');
+        $this->showFormModal = false;
     }
 
     public function delete(int $id): void
     {
         Candidate::findOrFail($id)->delete();
-        session()->flash('success', 'Candidate deleted');
+        $this->dispatch('toast', message: 'Kandidat dihapus', type: 'success');
+    }
+
+    public function confirmDelete(int $id): void
+    {
+        $this->candidateIdToDelete = $id;
+        $this->confirmingDeletion = true;
+    }
+
+    public function performDelete(): void
+    {
+        if (!$this->candidateIdToDelete) {
+            $this->confirmingDeletion = false;
+            return;
+        }
+        $id = $this->candidateIdToDelete;
+        Candidate::findOrFail($id)->delete();
+        $this->confirmingDeletion = false;
+        $this->candidateIdToDelete = null;
+        $this->dispatch('toast', message: 'Kandidat dihapus', type: 'success');
     }
 
     public function assignToElection(): void
@@ -119,11 +154,17 @@ class Candidates extends Component
             'candidate_id' => $this->assignCandidateId,
             'ballot_number' => $this->assignBallotNumber,
         ];
-        Validator::make($data, [
-            'election_id' => 'required|exists:elections,id',
-            'candidate_id' => 'required|exists:candidates,id',
-            'ballot_number' => 'nullable|integer|min:1',
-        ])->validate();
+        try {
+            Validator::make($data, [
+                'election_id' => 'required|exists:elections,id',
+                'candidate_id' => 'required|exists:candidates,id',
+                'ballot_number' => 'required|integer|min:1',
+            ])->validate();
+        } catch (ValidationException $e) {
+            // Show a single toast notification for incomplete/invalid inputs
+            $this->dispatch('toast', message: 'Lengkapi semua field dengan benar.', type: 'error');
+            throw $e;
+        }
 
         CandidateElection::updateOrCreate(
             [
@@ -133,7 +174,7 @@ class Candidates extends Component
             ['ballot_number' => $this->assignBallotNumber]
         );
 
-        session()->flash('success', 'Candidate assigned to election');
+        $this->dispatch('toast', message: 'Kandidat ditambahkan ke pemilihan', type: 'success');
         $this->assignElectionId = $this->assignCandidateId = $this->assignBallotNumber = null;
     }
 

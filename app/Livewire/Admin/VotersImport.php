@@ -27,6 +27,9 @@ class VotersImport extends Component
     public string $q = '';
     public int $perPage = 10;
     public ?string $filterType = null; // 'student' | 'staff' | null
+    public ?int $filterYear = null; // listing filter: year
+    public ?string $filterClass = null; // listing filter: class
+    public ?string $filterMajor = null; // listing filter: major
 
     // Edit form
     public ?int $editId = null;
@@ -40,9 +43,21 @@ class VotersImport extends Component
     // Recently generated tokens (plain) per voter id for display
     public array $recentTokens = [];
 
+    // Deletion confirmation modal state
+    public bool $confirmingDeletion = false;
+    public ?int $voterIdToDelete = null;
+
+    // Export
+    public string $exportType = 'unified'; // 'student' | 'staff' | 'unified'
+
+    // Import confirmation modal
+    public bool $confirmingImport = false;
+
     public function mount(): void
     {
         abort_unless(Auth::check(), 403);
+        // Default filter year to current year if not set
+        $this->filterYear = $this->filterYear ?? (int) now()->year;
     }
 
     public function import(): void
@@ -171,6 +186,7 @@ class VotersImport extends Component
             $msg .= ", token otomatis dibuat: $generatedCount";
         }
         session()->flash('success', $msg);
+        $this->dispatch('toast', message: $msg, type: 'success');
     }
 
     #[Layout('components.layouts.app')]
@@ -180,8 +196,10 @@ class VotersImport extends Component
         $this->recentTokens = Session::get('import.generated_tokens', []);
 
         $voters = Voter::query()
-            ->when($this->year, fn($q) => $q->where('year', $this->year))
+            ->when($this->filterYear, fn($q) => $q->where('year', $this->filterYear))
             ->when($this->filterType, fn($q) => $q->where('type', $this->filterType))
+            ->when($this->filterClass, fn($q) => $q->where('class', 'like', '%'.trim($this->filterClass).'%'))
+            ->when($this->filterMajor, fn($q) => $q->where('major', 'like', '%'.trim($this->filterMajor).'%'))
             ->when($this->q, function ($q) {
                 $term = "%{$this->q}%";
                 $q->where(function ($qq) use ($term) {
@@ -206,6 +224,53 @@ class VotersImport extends Component
     public function updatingFilterType()
     {
         $this->resetPage();
+    }
+
+    public function updatingFilterYear()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterClass()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterMajor()
+    {
+        $this->resetPage();
+    }
+
+    public function confirmImport(): void
+    {
+        $this->confirmingImport = true;
+    }
+
+    public function proceedImport(): void
+    {
+        $this->confirmingImport = false;
+        $this->import();
+    }
+
+    public function confirmDelete(int $id): void
+    {
+        $this->voterIdToDelete = $id;
+        $this->confirmingDeletion = true;
+    }
+
+    public function performDelete(): void
+    {
+        if (!$this->voterIdToDelete) {
+            $this->confirmingDeletion = false;
+            return;
+        }
+        $id = $this->voterIdToDelete;
+        Voter::whereKey($id)->delete();
+        Session::forget('import.generated_tokens.'.$id);
+        $this->confirmingDeletion = false;
+        $this->voterIdToDelete = null;
+        session()->flash('success', 'Data pemilih dihapus.');
+        $this->dispatch('toast', message: 'Data pemilih dihapus.', type: 'success');
     }
 
     public function editVoter(int $id): void
@@ -259,12 +324,14 @@ class VotersImport extends Component
             ->exists();
         if ($exists) {
             session()->flash('error', 'Identifier sudah digunakan untuk tahun ini.');
+            $this->dispatch('toast', message: 'Identifier sudah digunakan untuk tahun ini.', type: 'error');
             return;
         }
 
         $v->fill($payload)->save();
         $this->cancelEdit();
         session()->flash('success', 'Data pemilih diperbarui.');
+        $this->dispatch('toast', message: 'Data pemilih diperbarui.', type: 'success');
     }
 
     public function deleteVoter(int $id): void
@@ -273,7 +340,78 @@ class VotersImport extends Component
         // Remove any stored plain token for this voter from session mapping
         Session::forget('import.generated_tokens.'.$id);
         session()->flash('success', 'Data pemilih dihapus.');
+        $this->dispatch('toast', message: 'Data pemilih dihapus.', type: 'success');
     }
 
     // Manual regeneration removed by request; tokens are generated only during import
+
+    public function export()
+    {
+        $type = in_array($this->exportType, ['student','staff','unified'], true) ? $this->exportType : 'unified';
+        $year = $this->filterYear;
+
+        $headers = match ($type) {
+            'student' => ['type','identifier','name','class','major','token'],
+            'staff' => ['type','identifier','name','position','token'],
+            default => ['type','identifier','name','class','major','position','token'],
+        };
+
+        $query = Voter::query()
+            ->when($year, fn($q) => $q->where('year', $year))
+            ->when($type !== 'unified', fn($q) => $q->where('type', $type))
+            ->when($this->filterClass, fn($q) => $q->where('class', 'like', '%'.trim($this->filterClass).'%'))
+            ->when($this->filterMajor, fn($q) => $q->where('major', 'like', '%'.trim($this->filterMajor).'%'))
+            ->orderBy('id');
+
+        $filename = 'voters_'.($year ?: 'all')."_{$type}_".now()->format('Ymd_His').'.csv';
+
+        return response()->streamDownload(function () use ($query, $headers, $type) {
+            $out = fopen('php://output', 'w');
+            // Optional: BOM for Excel compatibility
+            fprintf($out, "\xEF\xBB\xBF");
+            fputcsv($out, $headers);
+
+            $query->chunk(1000, function ($chunk) use ($out, $type) {
+                foreach ($chunk as $v) {
+                    // Resolve plain token if we have it in recent session mapping
+                    $plainToken = session()->get('import.generated_tokens.'.$v->id, '');
+                    // Force Excel to treat as text if present
+                    $tokenText = $plainToken !== '' ? '="'.str_replace('"', '""', $plainToken).'"' : '';
+                    if ($type === 'student') {
+                        $row = [
+                            $v->type,
+                            $v->identifier,
+                            $v->name,
+                            $v->class,
+                            $v->major,
+                            $tokenText, // token as text
+                        ];
+                    } elseif ($type === 'staff') {
+                        $row = [
+                            $v->type,
+                            $v->identifier,
+                            $v->name,
+                            $v->position,
+                            $tokenText, // token as text
+                        ];
+                    } else { // unified
+                        $row = [
+                            $v->type,
+                            $v->identifier,
+                            $v->name,
+                            $v->class,
+                            $v->major,
+                            $v->position,
+                            $tokenText, // token as text
+                        ];
+                    }
+                    fputcsv($out, $row);
+                }
+            });
+
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
 }

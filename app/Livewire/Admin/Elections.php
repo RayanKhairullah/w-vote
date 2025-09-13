@@ -22,6 +22,12 @@ class Elections extends Component
     public ?string $end_at = null;
     public string $status = 'draft';
 
+    // Modal state
+    public bool $confirmingOpen = false;
+    public bool $confirmingClose = false;
+    public bool $confirmingDeletion = false;
+    public ?int $targetId = null;
+
     public function mount(): void
     {
         // Restrict to authenticated admins (users)
@@ -76,22 +82,62 @@ class Elections extends Component
 
         $this->resetForm();
         session()->flash('success', 'Election saved');
+        // Close the modal on the front-end (Alpine listens for this)
+        $this->dispatch('close-election-form');
     }
 
-    public function openElection(int $id): void
+    // Confirmation triggers
+    public function confirmOpen(int $id): void
     {
-        $e = Election::findOrFail($id);
+        $this->targetId = $id;
+        $this->confirmingOpen = true;
+    }
+
+    public function confirmClose(int $id): void
+    {
+        $this->targetId = $id;
+        $this->confirmingClose = true;
+    }
+
+    public function confirmDelete(int $id): void
+    {
+        $this->targetId = $id;
+        $this->confirmingDeletion = true;
+    }
+
+    // Perform actions
+    public function performOpen(): void
+    {
+        if (!$this->targetId) return;
+        $e = Election::findOrFail($this->targetId);
         $e->status = 'open';
         if (!$e->start_at) $e->start_at = now();
         $e->save();
+        $this->confirmingOpen = false;
+        $this->targetId = null;
+        session()->flash('success', 'Pemilihan dibuka.');
     }
 
-    public function closeElection(int $id): void
+    public function performClose(): void
     {
-        $e = Election::findOrFail($id);
+        if (!$this->targetId) return;
+        $e = Election::findOrFail($this->targetId);
         $e->status = 'closed';
         if (!$e->end_at) $e->end_at = now();
         $e->save();
+        $this->confirmingClose = false;
+        $this->targetId = null;
+        session()->flash('success', 'Pemilihan ditutup.');
+    }
+
+    public function performDelete(): void
+    {
+        if (!$this->targetId) return;
+        $e = Election::findOrFail($this->targetId);
+        $e->delete();
+        $this->confirmingDeletion = false;
+        $this->targetId = null;
+        session()->flash('success', 'Pemilihan dihapus.');
     }
 
     #[Layout('components.layouts.app')]
