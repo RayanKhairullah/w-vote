@@ -58,32 +58,40 @@ class Ballot extends Component
         redirect()->route('verify');
     }
 
-    #[Layout('components.layouts.auth')]
+    #[Layout('components.layouts.public')]
     public function render()
     {
-        $electionId = Session::get('voting.election_id');
-        if (!$electionId) {
-            return redirect()->route('verify');
+        try {
+            $electionId = Session::get('voting.election_id');
+            if (!$electionId) {
+                return redirect()->route('verify');
+            }
+
+            $voterId = Session::get('voting.voter_id');
+            if ($voterId) {
+                $voter = Voter::find($voterId);
+                $this->alreadyVoted = (bool) ($voter?->has_voted);
+            } else {
+                $this->alreadyVoted = false;
+            }
+
+            $election = Election::findOrFail($electionId);
+            $candidates = Candidate::select('candidates.*', 'candidate_election.ballot_number')
+                ->join('candidate_election', 'candidate_election.candidate_id', '=', 'candidates.id')
+                ->where('candidate_election.election_id', $electionId)
+                ->orderBy('candidate_election.ballot_number')
+                ->get();
+
+            return view('livewire.public.ballot', [
+                'election' => $election,
+                'candidates' => $candidates,
+            ]);
+        } catch (\BadMethodCallException $e) {
+            return view('livewire.public.error', [
+                'title' => 'Terjadi Kesalahan',
+                'message' => 'Terjadi kendala saat memuat halaman. Silakan kembali ke halaman verifikasi dan coba lagi.',
+                'cta' => route('verify'),
+            ]);
         }
-
-        $voterId = Session::get('voting.voter_id');
-        if ($voterId) {
-            $voter = Voter::find($voterId);
-            $this->alreadyVoted = (bool) ($voter?->has_voted);
-        } else {
-            $this->alreadyVoted = false;
-        }
-
-        $election = Election::findOrFail($electionId);
-        $candidates = Candidate::select('candidates.*', 'candidate_election.ballot_number')
-            ->join('candidate_election', 'candidate_election.candidate_id', '=', 'candidates.id')
-            ->where('candidate_election.election_id', $electionId)
-            ->orderBy('candidate_election.ballot_number')
-            ->get();
-
-        return view('livewire.public.ballot', [
-            'election' => $election,
-            'candidates' => $candidates,
-        ]);
     }
 }

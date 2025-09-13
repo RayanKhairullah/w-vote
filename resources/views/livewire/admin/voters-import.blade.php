@@ -26,50 +26,56 @@
     </div>
 
     <div class="mt-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 shadow-sm">
-        <div class="flex items-center justify-between mb-3 gap-3">
-            <div class="flex items-center gap-3">
-                <flux:input wire:model.live="q" placeholder="Cari identifier/nama/tipe..." />
-                <flux:input wire:model.defer="year" type="number" placeholder="Filter Tahun" />
+        <div class="bg-white dark:bg-zinc-800 p-5 rounded-lg shadow border border-gray-200 dark:border-zinc-700 mb-4">
+            <div class="flex items-end gap-3 flex-wrap">
+                <div class="flex-1 min-w-[220px]">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">Cari Pemilih</label>
+                    <flux:input wire:model.live="q" placeholder="Cari identifier / nama / tipe..." class="w-full" icon="magnifying-glass" />
+                </div>
                 <div>
-                    <label class="block text-xs text-gray-600 mb-1">Filter Tipe</label>
-                    <select class="w-40 rounded-md border-gray-300" wire:model="filterType">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">Filter Tahun</label>
+                    <flux:input wire:model.defer="year" type="number" placeholder="2025" class="w-40" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">Filter Tipe</label>
+                    <select class="w-40 rounded-md border-gray-300 bg-white dark:bg-zinc-800" wire:model="filterType">
                         <option value="">Semua</option>
                         <option value="student">student</option>
                         <option value="staff">staff</option>
                     </select>
                 </div>
+                <div class="ms-auto text-sm text-gray-500">Menampilkan {{ $voters->total() }} data</div>
             </div>
-            <div class="text-sm text-gray-500">Menampilkan {{ $voters->total() }} data</div>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-                <thead class="text-left text-gray-500">
+        <div class="overflow-x-auto bg-white dark:bg-zinc-800 shadow rounded-lg border border-gray-200 dark:border-zinc-700">
+            <table class="w-full text-left text-sm text-gray-700 dark:text-zinc-200">
+                <thead class="bg-gray-100 dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 uppercase text-xs font-semibold">
                     <tr>
-                        <th class="py-2 pr-4">ID</th>
-                        <th class="py-2 pr-4">Tahun</th>
-                        <th class="py-2 pr-4">Tipe</th>
-                        <th class="py-2 pr-4">Identifier</th>
-                        <th class="py-2 pr-4">Nama</th>
-                        <th class="py-2 pr-4">Kelas</th>
-                        <th class="py-2 pr-4">Jurusan</th>
-                        <th class="py-2 pr-4">Jabatan</th>
-                        <th class="py-2 pr-4">Token</th>
-                        <th class="py-2 pr-4">Aksi</th>
+                        <th class="px-4 py-3">ID</th>
+                        <th class="px-4 py-3">Tahun</th>
+                        <th class="px-4 py-3">Tipe</th>
+                        <th class="px-4 py-3">Identifier</th>
+                        <th class="px-4 py-3">Nama</th>
+                        <th class="px-4 py-3">Kelas</th>
+                        <th class="px-4 py-3">Jurusan</th>
+                        <th class="px-4 py-3">Jabatan</th>
+                        <th class="px-4 py-3">Token</th>
+                        <th class="px-4 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody class="divide-y divide-gray-200 dark:divide-zinc-700">
                     @forelse ($voters as $v)
-                        <tr class="border-t align-top">
-                            <td class="py-2 pr-4">{{ $v->id }}</td>
-                            <td class="py-2 pr-4">{{ $v->year }}</td>
-                            <td class="py-2 pr-4">{{ $v->type }}</td>
-                            <td class="py-2 pr-4 font-mono">{{ $v->identifier }}</td>
-                            <td class="py-2 pr-4">{{ $v->name }}</td>
-                            <td class="py-2 pr-4">{{ $v->class }}</td>
-                            <td class="py-2 pr-4">{{ $v->major }}</td>
-                            <td class="py-2 pr-4">{{ $v->position }}</td>
-                            <td class="py-2 pr-4">
+                        <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition duration-150 ease-in-out align-top">
+                            <td class="px-4 py-3 font-medium text-gray-500 dark:text-zinc-400">{{ $v->id }}</td>
+                            <td class="px-4 py-3">{{ $v->year }}</td>
+                            <td class="px-4 py-3">{{ $v->type }}</td>
+                            <td class="px-4 py-3 font-mono">{{ $v->identifier }}</td>
+                            <td class="px-4 py-3">{{ $v->name }}</td>
+                            <td class="px-4 py-3">{{ $v->class }}</td>
+                            <td class="px-4 py-3">{{ $v->major }}</td>
+                            <td class="px-4 py-3">{{ $v->position }}</td>
+                            <td class="px-4 py-3">
                                 <div class="flex items-center gap-2">
                                     @if (isset($recentTokens[$v->id]))
                                         <code class="text-xs px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800">{{ $recentTokens[$v->id] }}</code>
@@ -78,10 +84,10 @@
                                     @endif
                                 </div>
                             </td>
-                            <td class="py-2 pr-4">
-                                <div class="flex gap-2">
-                                    <flux:button size="xs" wire:click="editVoter({{ $v->id }})">Edit</flux:button>
-                                    <flux:button size="xs" wire:click="deleteVoter({{ $v->id }})">Hapus</flux:button>
+                            <td class="px-4 py-3">
+                                <div class="flex gap-2 justify-end">
+                                    <flux:button size="xs" variant="primary" icon="pencil-square" wire:click="editVoter({{ $v->id }})">Edit</flux:button>
+                                    <flux:button size="xs" variant="danger" icon="trash" wire:click="deleteVoter({{ $v->id }})">Hapus</flux:button>
                                 </div>
                             </td>
                         </tr>

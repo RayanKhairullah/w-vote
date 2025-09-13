@@ -12,9 +12,15 @@
             </a>
 
             <flux:navlist variant="outline">
-                <flux:navlist.group :heading="__('Platform')" class="grid">
-                    <flux:navlist.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>{{ __('Dashboard') }}</flux:navlist.item>
+                    <flux:navlist.item icon="home" :href="route('results')" :current="request()->routeIs('results')" wire:navigate>{{ __('Hasil Pemilihan') }}</flux:navlist.item>
+
+                <flux:navlist.group :heading="__('Managemen Data')" class="grid">
+                    <flux:navlist.item icon="calendar-days" :href="route('admin.elections')" :current="request()->routeIs('admin.elections')" wire:navigate>{{ __(' Pemilihan') }}</flux:navlist.item>
+                    <flux:navlist.item icon="users" :href="route('admin.candidates')" :current="request()->routeIs('admin.candidates')" wire:navigate>{{ __('Kandidat') }}</flux:navlist.item>
+                    <flux:navlist.item icon="user-group" :href="route('admin.voters.import')" :current="request()->routeIs('admin.voters.import')" wire:navigate>{{ __('Import Pemilih') }}</flux:navlist.item>
                 </flux:navlist.group>
+                
+                
             </flux:navlist>
 
             <flux:spacer />

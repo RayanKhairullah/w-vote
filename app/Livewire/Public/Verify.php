@@ -20,6 +20,13 @@ class Verify extends Component
     public ?string $error = null;
     public bool $alreadyVoted = false;
 
+    public function mount(): void
+    {
+        if ($this->year === null) {
+            $this->year = (int) now()->year;
+        }
+    }
+
     public function submit(): void
     {
         $data = [
@@ -70,7 +77,7 @@ class Verify extends Component
         $this->redirect(route('home'), navigate: true);
     }
 
-    #[Layout('components.layouts.auth')]
+    #[Layout('components.layouts.public')]
     public function render()
     {
         return view('livewire.public.verify');
