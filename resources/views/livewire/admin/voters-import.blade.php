@@ -50,9 +50,21 @@
                 </div>
             </div>
         </div>
-        <div class="mt-5 flex flex-wrap items-center gap-3">
-            <flux:button icon="arrow-up-tray" wire:click="confirmImport">Mulai Import</flux:button>
-            <span class="text-xs text-gray-400">Pastikan file sudah sesuai format.</span>
+        <div class="mt-5 flex flex-col gap-2">
+            <div class="flex flex-wrap items-center gap-3">
+                <flux:button icon="arrow-up-tray" wire:click="import" wire:loading.attr="disabled" wire:target="import">
+                    <span wire:loading.remove wire:target="import">Mulai Import</span>
+                    <span wire:loading wire:target="import" class="inline-flex items-center gap-2">
+                        Mengimpor...
+                    </span>
+                </flux:button>
+                <span class="text-xs text-gray-400">Pastikan file sudah sesuai format.</span>
+            </div>
+            <div wire:loading wire:target="import" class="w-full">
+                <div class="h-1 w-full bg-gray-200 dark:bg-zinc-700 rounded overflow-hidden">
+                    <div class="h-1 w-1/3 bg-blue-500 dark:bg-blue-400 animate-pulse rounded"></div>
+                </div>
+            </div>
         </div>
     </flux:card>
 
@@ -245,31 +257,5 @@
     </div>
     @endif
 
-    {{-- Modal Konfirmasi Mulai Import --}}
-    @if($confirmingImport)
-    <div class="fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <!-- Overlay -->
-            <div class="fixed inset-0 bg-black/50" wire:click="$set('confirmingImport', false)"></div>
-
-            <!-- Panel -->
-            <div class="relative bg-white dark:bg-zinc-800 rounded-lg p-6 w-full max-w-md z-[70]">
-                <div class="text-center">
-                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 mb-4">
-                        <svg class="h-6 w-6 text-amber-700 dark:text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5 19h14l-7-14-7 14z" />
-                        </svg>
-                    </div>
-                    <h3 id="import-modal-title" class="text-lg font-medium text-gray-900 dark:text-white mb-2">Mulai Import Data</h3>
-                    <p class="text-gray-600 dark:text-zinc-400 text-sm mb-1">Tahun: <span class="font-semibold">{{ $year ?: '-' }}</span></p>
-                    <p class="text-gray-600 dark:text-zinc-400 text-sm mb-4">Pastikan file CSV sudah sesuai format yang ditentukan.</p>
-                    <div class="flex justify-center gap-3">
-                        <flux:button variant="primary" class="px-4" wire:click="$set('confirmingImport', false)">Batal</flux:button>
-                        <flux:button variant="danger" class="px-4" wire:click="proceedImport">Ya, Mulai</flux:button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
+    
 </div>

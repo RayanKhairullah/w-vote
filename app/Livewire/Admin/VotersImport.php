@@ -4,12 +4,14 @@ namespace App\Livewire\Admin;
 
 use App\Models\ImportLog;
 use App\Models\Voter;
+use App\Models\VoterPlainToken;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Crypt;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -62,24 +64,25 @@ class VotersImport extends Component
 
     public function import(): void
     {
-        $data = [
-            'year' => $this->year,
-            'file' => $this->file,
-        ];
-        Validator::make($data, [
-            'year' => 'required|integer|min:2000|max:2100',
-            'file' => 'required|file|mimes:csv,txt|max:10240',
-        ])->validate();
+        try {
+            $data = [
+                'year' => $this->year,
+                'file' => $this->file,
+            ];
+            Validator::make($data, [
+                'year' => 'required|integer|min:2000|max:2100',
+                'file' => 'required|file|mimes:csv,txt|max:10240',
+            ])->validate();
 
-        // Ensure directory exists and store via Storage
-        if (!Storage::disk('local')->exists('imports')) {
-            Storage::disk('local')->makeDirectory('imports');
-        }
-        $path = Storage::disk('local')->putFile('imports', $this->file);
-        $full = storage_path('app/'.$path);
+            // Ensure directory exists and store via Storage
+            if (!Storage::disk('local')->exists('imports')) {
+                Storage::disk('local')->makeDirectory('imports');
+            }
+            $path = Storage::disk('local')->putFile('imports', $this->file);
+            $full = storage_path('app/'.$path);
 
-        $handle = Storage::disk('local')->readStream($path);
-        $header = fgetcsv($handle);
+            $handle = Storage::disk('local')->readStream($path);
+            $header = fgetcsv($handle);
         // Acceptable headers:
         // 1) student: type,identifier,name,class,major,token
         // 2) staff:   type,identifier,name,position,token
@@ -91,10 +94,11 @@ class VotersImport extends Component
         $details = [];
         $generatedCount = 0;
 
-        if (!$header) {
-            session()->flash('error', 'File kosong');
-            return;
-        }
+            if (!$header) {
+                session()->flash('error', 'File kosong');
+                $this->dispatch('toast', message: 'File kosong', type: 'error');
+                return;
+            }
 
         $map = array_map(fn($h) => strtolower(trim($h)), $header);
         $mode = null; // 'student' | 'staff' | 'unified'
@@ -104,10 +108,12 @@ class VotersImport extends Component
             $mode = 'staff';
         } elseif ($map === $expectedUnified) {
             $mode = 'unified';
-        } else {
-            session()->flash('error', 'Header CSV tidak sesuai. Contoh siswa: '.implode(',', $expectedStudent).' | staff: '.implode(',', $expectedStaff));
-            return;
-        }
+            } else {
+                $msg = 'Header CSV tidak sesuai. Contoh siswa: '.implode(',', $expectedStudent).' | staff: '.implode(',', $expectedStaff);
+                session()->flash('error', $msg);
+                $this->dispatch('toast', message: $msg, type: 'error');
+                return;
+            }
 
         while (($row = fgetcsv($handle)) !== false) {
             $total++;
@@ -163,12 +169,20 @@ class VotersImport extends Component
                     $this->recentTokens[$voterSaved->id] = $plainToken;
                     Session::put('import.generated_tokens.'.$voterSaved->id, $plainToken);
                 }
+
+                // Persist encrypted plain token for admin export/reference
+                if (!empty($plainToken) && isset($voterSaved)) {
+                    VoterPlainToken::updateOrCreate(
+                        ['voter_id' => $voterSaved->id],
+                        ['token_encrypted' => Crypt::encryptString($plainToken)]
+                    );
+                }
             } catch (\Throwable $e) {
                 $failed++;
                 $details[] = 'Row '.($total + 1).': '.$e->getMessage();
             }
         }
-        fclose($handle);
+            fclose($handle);
 
         ImportLog::create([
             'admin_id' => Auth::id(),
@@ -181,12 +195,17 @@ class VotersImport extends Component
             'created_at' => now(),
         ]);
 
-        $msg = "Import selesai. total=$total, inserted=$inserted, updated=$updated, failed=$failed";
-        if ($generatedCount > 0) {
-            $msg .= ", token otomatis dibuat: $generatedCount";
+            $msg = "Import selesai. total=$total, inserted=$inserted, updated=$updated, failed=$failed";
+            if ($generatedCount > 0) {
+                $msg .= ", token otomatis dibuat: $generatedCount";
+            }
+            session()->flash('success', $msg);
+            $this->dispatch('toast', message: $msg, type: 'success');
+        } catch (\Throwable $e) {
+            // Generic failure toast
+            $this->dispatch('toast', message: 'Gagal import: '.$e->getMessage(), type: 'error');
+            throw $e;
         }
-        session()->flash('success', $msg);
-        $this->dispatch('toast', message: $msg, type: 'success');
     }
 
     #[Layout('components.layouts.app')]
@@ -210,6 +229,20 @@ class VotersImport extends Component
             })
             ->orderBy('id', 'desc')
             ->paginate($this->perPage);
+
+        // Merge encrypted tokens from DB for the current page (fallback when session is empty)
+        $ids = collect($voters->items())->pluck('id')->all();
+        if ($ids) {
+            $encrypted = VoterPlainToken::whereIn('voter_id', $ids)->get(['voter_id','token_encrypted']);
+            foreach ($encrypted as $row) {
+                try {
+                    $plain = Crypt::decryptString($row->token_encrypted);
+                    $this->recentTokens[$row->voter_id] = $plain;
+                } catch (\Throwable $e) {
+                    // ignore decrypt errors
+                }
+            }
+        }
 
         return view('livewire.admin.voters-import', [
             'voters' => $voters,
@@ -266,6 +299,7 @@ class VotersImport extends Component
         }
         $id = $this->voterIdToDelete;
         Voter::whereKey($id)->delete();
+        VoterPlainToken::where('voter_id', $id)->delete();
         Session::forget('import.generated_tokens.'.$id);
         $this->confirmingDeletion = false;
         $this->voterIdToDelete = null;
@@ -339,6 +373,7 @@ class VotersImport extends Component
         Voter::whereKey($id)->delete();
         // Remove any stored plain token for this voter from session mapping
         Session::forget('import.generated_tokens.'.$id);
+        VoterPlainToken::where('voter_id', $id)->delete();
         session()->flash('success', 'Data pemilih dihapus.');
         $this->dispatch('toast', message: 'Data pemilih dihapus.', type: 'success');
     }
@@ -373,8 +408,14 @@ class VotersImport extends Component
 
             $query->chunk(1000, function ($chunk) use ($out, $type) {
                 foreach ($chunk as $v) {
-                    // Resolve plain token if we have it in recent session mapping
+                    // Resolve plain token from session mapping or encrypted table
                     $plainToken = session()->get('import.generated_tokens.'.$v->id, '');
+                    if ($plainToken === '') {
+                        $rec = VoterPlainToken::where('voter_id', $v->id)->first();
+                        if ($rec) {
+                            try { $plainToken = Crypt::decryptString($rec->token_encrypted); } catch (\Throwable $e) { $plainToken = ''; }
+                        }
+                    }
                     // Force Excel to treat as text if present
                     $tokenText = $plainToken !== '' ? '="'.str_replace('"', '""', $plainToken).'"' : '';
                     if ($type === 'student') {
