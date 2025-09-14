@@ -105,6 +105,15 @@
                     <label class="block text-sm font-medium text-transparent mb-1">Export</label>
                     <flux:button icon="arrow-down-tray" wire:click="export">Export CSV</flux:button>
                 </div>
+                <div class="pb-0.5">
+                    <label class="block text-sm font-medium text-transparent mb-1">Hapus</label>
+                    <flux:button icon="trash" variant="danger" wire:click="deleteSelected" :disabled="empty($selectedVoters)">Hapus Terpilih</flux:button>
+                </div>
+                @if (!empty($selectedVoters))
+                <div class="pb-0.5 text-xs text-gray-600 dark:text-zinc-300">
+                    <span class="block">Terpilih: {{ count($selectedVoters) }}</span>
+                </div>
+                @endif
             </div>
         </div>
 
@@ -112,6 +121,9 @@
             <table class="w-full text-left text-sm text-gray-700 dark:text-zinc-200">
                 <thead class="bg-gray-100/80 dark:bg-zinc-700/80 text-gray-900 dark:text-zinc-100 uppercase text-xs font-semibold sticky top-0 z-10 backdrop-blur">
                     <tr>
+                        <th class="px-4 py-3 w-10">
+                            <input type="checkbox" wire:model.live="selectAll" class="rounded border-gray-300 dark:border-zinc-600 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-zinc-700 dark:checked:bg-blue-600">
+                        </th>
                         <th class="px-4 py-3">No</th>
                         <th class="px-4 py-3">Tahun</th>
                         <th class="px-4 py-3">Tipe</th>
@@ -128,6 +140,9 @@
                 <tbody class="divide-y divide-gray-200 dark:divide-zinc-700">
                     @forelse ($voters as $v)
                     <tr class="align-top transition duration-150 ease-in-out odd:bg-white even:bg-gray-50/60 hover:bg-gray-100/60 dark:odd:bg-zinc-800 dark:even:bg-zinc-800/60 dark:hover:bg-zinc-700/40">
+                        <td class="px-4 py-3">
+                            <input type="checkbox" wire:model.live="selectedVoters" value="{{ $v->id }}" class="rounded border-gray-300 dark:border-zinc-600 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 dark:bg-zinc-700 dark:checked:bg-blue-600">
+                        </td>
                         <td class="px-4 py-3 font-medium text-gray-500 dark:text-zinc-400">{{ $voters->firstItem() + $loop->index }}</td>
                         <td class="px-4 py-3">{{ $v->year }}</td>
                         <td class="px-4 py-3 capitalize">{{ $v->type }}</td>
@@ -155,14 +170,13 @@
                         <td class="px-4 py-3">
                             <div class="flex gap-2 justify-end">
                                 <flux:button size="xs" variant="primary" icon="pencil-square" wire:click="editVoter({{ $v->id }})">Edit</flux:button>
-                                <flux:button size="xs" variant="danger" icon="trash" wire:click="confirmDelete({{ $v->id }})">Hapus</flux:button>
                             </div>
                         </td>
                     </tr>
 
                     @if ($editId === $v->id)
                     <tr class="border-t bg-zinc-50/60 dark:bg-zinc-800/30">
-                        <td colspan="11" class="p-3">
+                        <td colspan="12" class="p-3">
                             <div class="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm">
                                 <div class="md:col-span-2">
                                     <flux:select wire:model="e_type" label="Tipe">
@@ -198,7 +212,7 @@
                     @endif
                     @empty
                     <tr>
-                        <td colspan="10" class="py-10 text-center">
+                        <td colspan="12" class="py-10 text-center">
                             <div class="text-sm text-gray-500 dark:text-zinc-400">
                                 Tidak ada data untuk ditampilkan.
                             </div>
@@ -230,32 +244,7 @@
         @endif
     </flux:card>
 
-    {{-- Modal Konfirmasi Hapus Pemilih --}}
-    @if($confirmingDeletion)
-    <div class="fixed inset-0 z-[60] overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <!-- Background overlay -->
-            <div class="fixed inset-0 bg-black/50" wire:click="$set('confirmingDeletion', false)"></div>
-
-            <!-- Modal panel -->
-            <div class="relative bg-white dark:bg-zinc-800 rounded-lg p-6 w-full max-w-sm z-[70]">
-                <div class="text-center">
-                    <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 mb-4">
-                        <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2" id="modal-title">Hapus Pemilih</h3>
-                    <p class="text-gray-500 dark:text-zinc-400 mb-6">Apakah Anda yakin ingin menghapus data pemilih ini? Tindakan ini tidak dapat dibatalkan.</p>
-                    <div class="flex justify-center gap-3">
-                        <flux:button wire:click="$set('confirmingDeletion', false)" variant="primary" class="px-4">Batal</flux:button>
-                        <flux:button wire:click="performDelete" variant="danger" class="px-4">Ya, Hapus</flux:button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    @endif
+    
 
     
 </div>

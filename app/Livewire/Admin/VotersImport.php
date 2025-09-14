@@ -49,6 +49,11 @@ class VotersImport extends Component
     public bool $confirmingDeletion = false;
     public ?int $voterIdToDelete = null;
 
+    // Bulk selection
+    public bool $selectAll = false;
+    /** @var array<int> */
+    public array $selectedVoters = [];
+
     // Export
     public string $exportType = 'unified'; // 'student' | 'staff' | 'unified'
 
@@ -65,6 +70,11 @@ class VotersImport extends Component
     public function import(): void
     {
         try {
+            // Allow longer processing time for large CSV imports
+            if (function_exists('set_time_limit')) {
+                @set_time_limit(0);
+            }
+            @ini_set('max_execution_time', '0');
             $data = [
                 'year' => $this->year,
                 'file' => $this->file,
@@ -140,6 +150,10 @@ class VotersImport extends Component
                     $generatedThisRow = true;
                     $generatedCount++;
                 }
+                // Use reduced bcrypt rounds for import-time token hashing only to speed up bulk operations.
+                // This does NOT affect user password hashing.
+                $tokenHash = Hash::make($plainToken, ['rounds' => 6]);
+
                 $payload = [
                     'type' => $type,
                     'identifier' => $identifier,
@@ -147,7 +161,7 @@ class VotersImport extends Component
                     'class' => trim($class) ?: null,
                     'major' => trim($major) ?: null,
                     'position' => trim($position) ?: null,
-                    'token_hash' => Hash::make($plainToken),
+                    'token_hash' => $tokenHash,
                     'has_voted' => false,
                     'year' => $this->year,
                 ];
@@ -252,26 +266,31 @@ class VotersImport extends Component
     public function updatingQ()
     {
         $this->resetPage();
+        $this->selectAll = false;
     }
 
     public function updatingFilterType()
     {
         $this->resetPage();
+        $this->selectAll = false;
     }
 
     public function updatingFilterYear()
     {
         $this->resetPage();
+        $this->selectAll = false;
     }
 
     public function updatingFilterClass()
     {
         $this->resetPage();
+        $this->selectAll = false;
     }
 
     public function updatingFilterMajor()
     {
         $this->resetPage();
+        $this->selectAll = false;
     }
 
     public function confirmImport(): void
@@ -376,6 +395,81 @@ class VotersImport extends Component
         VoterPlainToken::where('voter_id', $id)->delete();
         session()->flash('success', 'Data pemilih dihapus.');
         $this->dispatch('toast', message: 'Data pemilih dihapus.', type: 'success');
+    }
+
+    /**
+     * Toggle select all for current page rows only.
+     */
+    public function updatedSelectAll(bool $value): void
+    {
+        $currentIds = $this->currentPageIds();
+        if ($value) {
+            // Merge and keep unique
+            $this->selectedVoters = array_values(array_unique(array_merge($this->selectedVoters, $currentIds)));
+        } else {
+            // Remove current page ids from selection
+            $this->selectedVoters = array_values(array_diff($this->selectedVoters, $currentIds));
+        }
+    }
+
+    /** Ensure selectAll reflects current page selection on render/update. */
+    public function hydrate(): void
+    {
+        $current = $this->currentPageIds();
+        $this->selectAll = $current !== [] && count(array_intersect($current, $this->selectedVoters)) === count($current);
+    }
+
+    /** Reset selectAll when changing pagination size or page */
+    public function updatingPage(): void { $this->selectAll = false; }
+    public function updatingPerPage(): void { $this->selectAll = false; }
+
+    /** Bulk delete selected voters */
+    public function deleteSelected(): void
+    {
+        $ids = array_values(array_filter($this->selectedVoters, fn($v) => is_numeric($v)));
+        if (empty($ids)) {
+            $this->dispatch('toast', message: 'Tidak ada data yang dipilih.', type: 'warning');
+            return;
+        }
+        // Delete voters
+        Voter::whereIn('id', $ids)->delete();
+        VoterPlainToken::whereIn('voter_id', $ids)->delete();
+        // Clean session tokens
+        foreach ($ids as $id) {
+            Session::forget('import.generated_tokens.'.$id);
+        }
+        // Clear selection
+        $this->selectedVoters = [];
+        $this->selectAll = false;
+        session()->flash('success', 'Berhasil menghapus '.count($ids).' data.');
+        $this->dispatch('toast', message: 'Berhasil menghapus '.count($ids).' data.', type: 'success');
+    }
+
+    /**
+     * Get the IDs present on the current page with current filters.
+     *
+     * @return array<int>
+     */
+    protected function currentPageIds(): array
+    {
+        $query = Voter::query()
+            ->when($this->filterYear, fn($q) => $q->where('year', $this->filterYear))
+            ->when($this->filterType, fn($q) => $q->where('type', $this->filterType))
+            ->when($this->filterClass, fn($q) => $q->where('class', 'like', '%'.trim($this->filterClass).'%'))
+            ->when($this->filterMajor, fn($q) => $q->where('major', 'like', '%'.trim($this->filterMajor).'%'))
+            ->when($this->q, function ($q) {
+                $term = "%{$this->q}%";
+                $q->where(function ($qq) use ($term) {
+                    $qq->where('identifier', 'like', $term)
+                       ->orWhere('name', 'like', $term)
+                       ->orWhere('type', 'like', $term);
+                });
+            })
+            ->orderBy('id', 'desc');
+
+        // Clone current pagination context to fetch only current page ids
+        $paginator = $query->paginate($this->perPage, ['id'], 'page', $this->getPage());
+        return collect($paginator->items())->pluck('id')->all();
     }
 
     // Manual regeneration removed by request; tokens are generated only during import
