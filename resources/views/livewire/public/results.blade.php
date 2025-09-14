@@ -371,16 +371,8 @@ $candVotes = $candidatesForChart->map(fn($c) => (int)($totals[$c->id] ?? 0))->va
         };
 
         // Composition Chart (Bar)
-        const studentCount = {
-            {
-                (int)($stats['studentCount'] ?? 0)
-            }
-        };
-        const staffCount = {
-            {
-                (int)($stats['staffCount'] ?? 0)
-            }
-        };
+        const studentCount = {{ (int)($stats['studentCount'] ?? 0) }};
+        const staffCount   = {{ (int)($stats['staffCount'] ?? 0) }};
         if (compCtx) {
             chartStore.comp = new Chart(compCtx, {
                 type: 'bar',
@@ -445,21 +437,9 @@ $candVotes = $candidatesForChart->map(fn($c) => (int)($totals[$c->id] ?? 0))->va
         }
 
         // Participation Chart (Doughnut)
-        const participants = {
-            {
-                (int)($stats['participants'] ?? 0)
-            }
-        };
-        const nonParticipants = {
-            {
-                (int)($stats['nonParticipants'] ?? 0)
-            }
-        };
-        const participationPct = {
-            {
-                (float)($stats['participationPct'] ?? 0)
-            }
-        };
+        const participants       = {{ (int)($stats['participants'] ?? 0) }};
+        const nonParticipants    = {{ (int)($stats['nonParticipants'] ?? 0) }};
+        const participationPct   = {{ (float)($stats['participationPct'] ?? 0) }};
 
         if (partCtx) chartStore.part = new Chart(partCtx, {
             type: 'doughnut',

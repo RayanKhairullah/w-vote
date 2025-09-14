@@ -19,10 +19,21 @@
 
             <div class="md:col-span-2 space-y-2">
                 <label class="block text-sm font-medium text-gray-700 dark:text-zinc-300">File CSV</label>
-                <input type="file" wire:model="file" accept=".csv,text/csv" class="w-full rounded-md border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-2.5 text-sm" />
+                <input type="file" wire:model="file" accept=".csv,text/csv,.txt" class="w-full rounded-md border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 p-2.5 text-sm" />
                 @error('file')
                 <p class="text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
                 @enderror
+
+                <div class="text-xs text-gray-500 dark:text-zinc-400">
+                    <span wire:loading wire:target="file">Mengunggah file...</span>
+                    <span wire:loading.remove wire:target="file">
+                        @if ($file)
+                            File siap diimpor.
+                        @else
+                            Belum ada file dipilih.
+                        @endif
+                    </span>
+                </div>
 
                 <div class="mt-2 rounded-md border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-900/40 p-3">
                     <p class="text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">Format kolom (wajib urut):</p>
@@ -52,7 +63,7 @@
         </div>
         <div class="mt-5 flex flex-col gap-2">
             <div class="flex flex-wrap items-center gap-3">
-                <flux:button icon="arrow-up-tray" wire:click="import" wire:loading.attr="disabled" wire:target="import">
+                <flux:button icon="arrow-up-tray" wire:click="import" wire:loading.attr="disabled" wire:target="import,file">
                     <span wire:loading.remove wire:target="import">Mulai Import</span>
                     <span wire:loading wire:target="import" class="inline-flex items-center gap-2">
                         Mengimpor...
@@ -103,7 +114,7 @@
                 </div>
                 <div class="pb-0.5">
                     <label class="block text-sm font-medium text-transparent mb-1">Export</label>
-                    <flux:button icon="arrow-down-tray" wire:click="export">Export CSV</flux:button>
+                    <flux:button icon="arrow-down-tray" wire:click="export">Export Excel</flux:button>
                 </div>
                 <div class="pb-0.5">
                     <label class="block text-sm font-medium text-transparent mb-1">Hapus</label>

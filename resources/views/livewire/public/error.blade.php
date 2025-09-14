@@ -1,4 +1,5 @@
-<div class="max-w-xl mx-auto">
+<div class="h-full flex items-center justify-center px-4">
+    <div class="w-full max-w-md">
     <flux:card class="p-6 text-center">
         <flux:heading size="lg" class="mb-2">{{ $title ?? 'Terjadi Kesalahan' }}</flux:heading>
         <p class="text-gray-600 dark:text-zinc-300 mb-4">
@@ -10,4 +11,5 @@
             </a>
         </div>
     </flux:card>
+    </div>
 </div>

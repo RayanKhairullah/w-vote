@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Crypt;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -75,6 +78,13 @@ class VotersImport extends Component
                 @set_time_limit(0);
             }
             @ini_set('max_execution_time', '0');
+            
+            // Ensure a file is selected before proceeding (helps when upload hasn't finished yet)
+            if (!$this->file) {
+                session()->flash('error', 'Pilih file CSV terlebih dahulu.');
+                $this->dispatch('toast', message: 'Pilih file CSV terlebih dahulu.', type: 'error');
+                return;
+            }
             $data = [
                 'year' => $this->year,
                 'file' => $this->file,
@@ -485,68 +495,109 @@ class VotersImport extends Component
             default => ['type','identifier','name','class','major','position','token'],
         };
 
-        $query = Voter::query()
+        $voters = Voter::query()
             ->when($year, fn($q) => $q->where('year', $year))
             ->when($type !== 'unified', fn($q) => $q->where('type', $type))
             ->when($this->filterClass, fn($q) => $q->where('class', 'like', '%'.trim($this->filterClass).'%'))
             ->when($this->filterMajor, fn($q) => $q->where('major', 'like', '%'.trim($this->filterMajor).'%'))
-            ->orderBy('id');
+            ->orderBy('id')
+            ->get();
 
-        $filename = 'voters_'.($year ?: 'all')."_{$type}_".now()->format('Ymd_His').'.csv';
+        $filename = 'voters_'.($year ?: 'all')."_{$type}_".now()->format('Ymd_His').'.xlsx';
 
-        return response()->streamDownload(function () use ($query, $headers, $type) {
-            $out = fopen('php://output', 'w');
-            // Optional: BOM for Excel compatibility
-            fprintf($out, "\xEF\xBB\xBF");
-            fputcsv($out, $headers);
+        // Create new spreadsheet
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        
+        // Set headers
+        $col = 1;
+        foreach ($headers as $header) {
+            $sheet->setCellValueByColumnAndRow($col, 1, $header);
+            $col++;
+        }
 
-            $query->chunk(1000, function ($chunk) use ($out, $type) {
-                foreach ($chunk as $v) {
-                    // Resolve plain token from session mapping or encrypted table
-                    $plainToken = session()->get('import.generated_tokens.'.$v->id, '');
-                    if ($plainToken === '') {
-                        $rec = VoterPlainToken::where('voter_id', $v->id)->first();
-                        if ($rec) {
-                            try { $plainToken = Crypt::decryptString($rec->token_encrypted); } catch (\Throwable $e) { $plainToken = ''; }
-                        }
+        // Style headers
+        $headerRange = 'A1:' . chr(64 + count($headers)) . '1';
+        $sheet->getStyle($headerRange)->getFont()->setBold(true);
+        $sheet->getStyle($headerRange)->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('E5E7EB');
+
+        // Add data
+        $row = 2;
+        foreach ($voters as $v) {
+            // Resolve plain token from session mapping or encrypted table
+            $plainToken = session()->get('import.generated_tokens.'.$v->id, '');
+            if ($plainToken === '') {
+                $rec = VoterPlainToken::where('voter_id', $v->id)->first();
+                if ($rec) {
+                    try { 
+                        $plainToken = Crypt::decryptString($rec->token_encrypted); 
+                    } catch (\Throwable $e) { 
+                        $plainToken = ''; 
                     }
-                    // Force Excel to treat as text if present
-                    $tokenText = $plainToken !== '' ? '="'.str_replace('"', '""', $plainToken).'"' : '';
-                    if ($type === 'student') {
-                        $row = [
-                            $v->type,
-                            $v->identifier,
-                            $v->name,
-                            $v->class,
-                            $v->major,
-                            $tokenText, // token as text
-                        ];
-                    } elseif ($type === 'staff') {
-                        $row = [
-                            $v->type,
-                            $v->identifier,
-                            $v->name,
-                            $v->position,
-                            $tokenText, // token as text
-                        ];
-                    } else { // unified
-                        $row = [
-                            $v->type,
-                            $v->identifier,
-                            $v->name,
-                            $v->class,
-                            $v->major,
-                            $v->position,
-                            $tokenText, // token as text
-                        ];
-                    }
-                    fputcsv($out, $row);
                 }
-            });
+            }
 
-            fclose($out);
-        }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-        ]);
+            if ($type === 'student') {
+                $data = [
+                    $v->type,
+                    $v->identifier,
+                    $v->name,
+                    $v->class,
+                    $v->major,
+                    $plainToken,
+                ];
+            } elseif ($type === 'staff') {
+                $data = [
+                    $v->type,
+                    $v->identifier,
+                    $v->name,
+                    $v->position,
+                    $plainToken,
+                ];
+            } else { // unified
+                $data = [
+                    $v->type,
+                    $v->identifier,
+                    $v->name,
+                    $v->class,
+                    $v->major,
+                    $v->position,
+                    $plainToken,
+                ];
+            }
+
+            $col = 1;
+            foreach ($data as $value) {
+                $sheet->setCellValueByColumnAndRow($col, $row, $value);
+                $col++;
+            }
+            $row++;
+        }
+
+        // Format token column as text
+        $tokenCol = match ($type) {
+            'student' => 'F',
+            'staff' => 'E',
+            default => 'G',
+        };
+        $sheet->getStyle($tokenCol . '2:' . $tokenCol . $row)
+            ->getNumberFormat()
+            ->setFormatCode(NumberFormat::FORMAT_TEXT);
+
+        // Auto-size columns
+        foreach (range('A', chr(64 + count($headers))) as $columnID) {
+            $sheet->getColumnDimension($columnID)->setAutoSize(true);
+        }
+
+        // Create writer and save to temporary file
+        $writer = new Xlsx($spreadsheet);
+        $tempFile = tempnam(sys_get_temp_dir(), 'voters_export_');
+        $writer->save($tempFile);
+
+        return response()->download($tempFile, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
     }
 }
