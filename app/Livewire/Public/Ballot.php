@@ -57,27 +57,35 @@ class Ballot extends Component
             'selected_candidate_id' => 'required|exists:candidates,id',
         ])->validate();
 
-        DB::transaction(function () use ($voterId, $electionId, $tokenHashUsed) {
-            $voter = Voter::lockForUpdate()->findOrFail($voterId);
-            if ($voter->has_voted) {
-                throw new \RuntimeException('Anda sudah memberikan suara.');
-            }
+        try {
+            DB::transaction(function () use ($voterId, $electionId, $tokenHashUsed) {
+                $voter = Voter::lockForUpdate()->findOrFail($voterId);
+                if ($voter->has_voted) {
+                    throw new \RuntimeException('Anda sudah memberikan suara.');
+                }
 
-            Vote::create([
-                'election_id' => $electionId,
-                'voter_id' => $voterId,
-                'candidate_id' => $this->selected_candidate_id,
-                'token_hash_used' => $tokenHashUsed,
-                'created_at' => now(),
-            ]);
+                Vote::create([
+                    'election_id' => $electionId,
+                    'voter_id' => $voterId,
+                    'candidate_id' => $this->selected_candidate_id,
+                    'token_hash_used' => $tokenHashUsed,
+                    'created_at' => now(),
+                ]);
 
-            $voter->has_voted = true;
-            $voter->last_voted_at = now();
-            $voter->save();
-        });
-
-        // Clear session and go back to verify so next voter can proceed
-        Session::forget(['voting.voter_id', 'voting.election_id', 'voting.token_hash_used']);
+                $voter->has_voted = true;
+                $voter->last_voted_at = now();
+                $voter->save();
+            });
+            
+            // Clear session and add success notification
+            Session::forget(['voting.voter_id', 'voting.election_id', 'voting.token_hash_used']);
+            session()->flash('vote_success', 'Suara Anda berhasil dikirim! Terima kasih telah berpartisipasi dalam pemilihan.');
+            
+        } catch (\Exception $e) {
+            // Add error notification
+            session()->flash('vote_error', 'Terjadi kesalahan saat mengirim suara: ' . $e->getMessage());
+        }
+        
         redirect()->route('verify');
     }
 
