@@ -13,6 +13,7 @@
 
             <flux:navlist variant="outline">
                     <flux:navlist.item icon="chart-bar" :href="route('results')" :current="request()->routeIs('results')" wire:navigate>{{ __('Hasil Pemilihan') }}</flux:navlist.item>
+                    <flux:navlist.item icon="sparkles" :href="route('congrats')" :current="request()->routeIs('congrats')" wire:navigate>{{ __('Twibbon Pemenang') }}</flux:navlist.item>
 
                 <flux:navlist.group :heading="__('Manajemen Data')" class="grid">
                     <flux:navlist.item icon="calendar-days" :href="route('admin.elections')" :current="request()->routeIs('admin.elections')" wire:navigate>{{ __(' Pemilihan') }}</flux:navlist.item>

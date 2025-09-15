@@ -9,6 +9,7 @@ use App\Livewire\Admin\VotersImport as AdminVotersImport;
 use App\Livewire\Public\Verify as PublicVerify;
 use App\Livewire\Public\Ballot as PublicBallot;
 use App\Livewire\Public\Results as PublicResults;
+use App\Livewire\Public\Congrats as PublicCongrats;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', PublicVerify::class)->name('home');
@@ -32,6 +33,7 @@ Route::middleware(['auth'])->group(function () {
 // Public voting flow
 Route::get('verify', PublicVerify::class)->name('verify');
 Route::get('ballot', PublicBallot::class)->name('ballot');
+Route::get('congrats', PublicCongrats::class)->name('congrats');
 
 require __DIR__.'/auth.php';
 

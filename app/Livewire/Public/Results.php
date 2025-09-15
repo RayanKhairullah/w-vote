@@ -6,6 +6,7 @@ use App\Models\Election;
 use App\Models\Vote;
 use App\Models\Voter;
 use App\Models\CandidateElection;
+use App\Services\ElectionExportService;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -14,6 +15,50 @@ class Results extends Component
 {
     #[Url]
     public ?int $electionId = null; // election id
+    
+    public bool $isExporting = false;
+    public bool $autoRefresh = true;
+
+    public function exportResults($format = 'xlsx')
+    {
+        $this->isExporting = true;
+        
+        try {
+            $election = $this->electionId
+                ? Election::findOrFail($this->electionId)
+                : Election::where('status', 'open')->orderByDesc('year')->first();
+
+            if (!$election) {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'Tidak ada pemilihan yang tersedia untuk diekspor.'
+                ]);
+                return;
+            }
+
+            $exportService = new ElectionExportService();
+            
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Laporan berhasil diekspor! File akan segera diunduh.'
+            ]);
+            
+            return $exportService->exportDetailedResults($election, $format);
+            
+        } catch (\Exception $e) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Terjadi kesalahan saat mengekspor laporan: ' . $e->getMessage()
+            ]);
+        } finally {
+            $this->isExporting = false;
+        }
+    }
+
+    public function toggleAutoRefresh()
+    {
+        $this->autoRefresh = !$this->autoRefresh;
+    }
 
     #[Layout('components.layouts.app')]
     public function render()
@@ -76,6 +121,7 @@ class Results extends Component
             'stats' => $stats,
             'elections' => $elections,
             'totalVotes' => $totalVotes,
+            'lastUpdated' => now(),
         ]);
     }
 }

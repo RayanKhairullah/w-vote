@@ -1,4 +1,4 @@
-<div class="max-w-6xl mx-auto px-4">
+<div class="max-w-6xl mx-auto px-4 min-h-screen flex flex-col items-center justify-center py-12">
     <flux:heading size="xl" class="mb-2 text-center">Pilih Kandidat</flux:heading>
 
     <div class="mb-6 flex items-center justify-center">
@@ -8,7 +8,7 @@
         </span>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 justify-center place-items-center">
         @foreach ($candidates as $c)
             <div
                 @class([
