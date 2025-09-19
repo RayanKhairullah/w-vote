@@ -117,6 +117,7 @@ class Ballot extends Component
         return view('livewire.public.ballot', [
             'election' => $election,
             'candidates' => $candidates,
+            'voter' => $voter,
         ]);
     }
 }

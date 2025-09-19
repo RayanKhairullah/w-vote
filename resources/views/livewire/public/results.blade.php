@@ -276,7 +276,17 @@
             </div>
             <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Grafik Perolehan Suara</h4>
         </div>
-        
+
+        <!-- Safelist gradient classes to ensure Tailwind includes them in the build -->
+        <div class="hidden">
+            <span class="bg-gradient-to-r from-blue-500 to-blue-600"></span>
+            <span class="bg-gradient-to-r from-emerald-500 to-emerald-600"></span>
+            <span class="bg-gradient-to-r from-purple-500 to-purple-600"></span>
+            <span class="bg-gradient-to-r from-orange-500 to-orange-600"></span>
+            <span class="bg-gradient-to-r from-red-500 to-red-600"></span>
+            <span class="bg-gradient-to-r from-teal-500 to-teal-600"></span>
+        </div>
+
         @php
         $candidates = \App\Models\Candidate::select('candidates.*', 'candidate_election.ballot_number')
             ->join('candidate_election', 'candidate_election.candidate_id', '=', 'candidates.id')
@@ -325,7 +335,8 @@
                         $percentage = $maxVotes > 0 ? ($votes / $maxVotes * 100) : 0;
                         $votePercentage = $totalVotes > 0 ? ($votes / $totalVotes * 100) : 0;
                         $colors = ['from-blue-500 to-blue-600', 'from-emerald-500 to-emerald-600', 'from-purple-500 to-purple-600', 'from-orange-500 to-orange-600', 'from-red-500 to-red-600', 'from-teal-500 to-teal-600'];
-                        $colorIndex = $loop->index % count($colors);
+                        // Stabilize color mapping using ballot number so colors don't shift with ordering
+                        $colorIndex = (($c->ballot_number - 1) % count($colors));
                         @endphp
                         <div class="h-16 flex items-center border-b border-gray-100 dark:border-zinc-700 last:border-b-0">
                             <div class="relative w-full h-8">

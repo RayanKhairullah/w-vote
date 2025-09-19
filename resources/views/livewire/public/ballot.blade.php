@@ -8,6 +8,19 @@
         </span>
     </div>
 
+    @if(!empty($voter))
+    <div class="-mt-3 mb-8 flex items-center justify-center">
+        <span class="inline-flex items-center gap-2 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200 px-3 py-1 text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-7a1 1 0 112 0v3a1 1 0 11-2 0v-3zm1-5a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd"/></svg>
+            <span class="font-medium">Pemilih:</span>
+            <span>{{ $voter->name }}</span>
+            @if($voter->identifier)
+                <span class="text-emerald-700/80 dark:text-emerald-300/80">• {{ $voter->identifier }}</span>
+            @endif
+        </span>
+    </div>
+    @endif
+
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 justify-center place-items-center">
         @foreach ($candidates as $c)
             <div

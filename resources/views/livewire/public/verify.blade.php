@@ -128,7 +128,7 @@
         <!-- Footer -->
         <div class="text-center">
             <flux:subheading class="text-zinc-500">Sistem Pemilihan Elektronik</flux:subheading>
-            <flux:subheading class="text-zinc-500">Develop by Oreo Team</flux:subheading>
+            <flux:subheading class="text-zinc-500">Develop by Oreos Team</flux:subheading>
         </div>
     </div>
 </div>

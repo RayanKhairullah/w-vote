@@ -54,10 +54,10 @@
                             <div class="absolute inset-0 p-6 flex flex-col items-center justify-between text-center">
                                 <div class="w-full mb-4">
                                     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-medium shadow">
-                                        <img src="{{ asset('images/logo-w_vote.png') }}" alt="Logo Aplikasi" class="h-4 w-4 rounded-sm object-contain bg-white/70 p-[1px]" />
+                                        <img src="{{ asset('images/logo-w_vote.png') }}" alt="Logo Aplikasi" class="h-7 w-7 rounded-sm object-contain bg-white/70 p-[1px]" />
                                         @php $schoolLogo = public_path('images/logosmea.png'); @endphp
                                         @if (file_exists($schoolLogo))
-                                            <img src="{{ asset('images/logosmea.png') }}" alt="Logo Sekolah" class="h-4 w-4 rounded-sm object-contain bg-white/70 p-[1px]" />
+                                            <img src="{{ asset('images/logosmea.png') }}" alt="Logo Sekolah" class="h-7 w-7 rounded-sm object-contain" />
                                         @else
                                             <!-- Fallback placeholder icon for school logo -->
                                             <svg class="h-4 w-4 text-white/80" viewBox="0 0 24 24" fill="none" stroke="currentColor">

@@ -45,6 +45,17 @@ class VotersImport extends Component
     public ?string $e_major = null;
     public ?string $e_position = null;
 
+    // Add form
+    public bool $showAddForm = false;
+    public ?int $a_year = null;
+    public string $a_type = 'student';
+    public string $a_identifier = '';
+    public string $a_name = '';
+    public ?string $a_class = null;
+    public ?string $a_major = null;
+    public ?string $a_position = null;
+    public ?string $a_token = null; // optional plain token
+
     // Recently generated tokens (plain) per voter id for display
     public array $recentTokens = [];
 
@@ -68,6 +79,8 @@ class VotersImport extends Component
         abort_unless(Auth::check(), 403);
         // Default filter year to current year if not set
         $this->filterYear = $this->filterYear ?? (int) now()->year;
+        // Default add form year to filterYear
+        $this->a_year = $this->filterYear;
     }
 
     public function import(): void
@@ -483,6 +496,98 @@ class VotersImport extends Component
     }
 
     // Manual regeneration removed by request; tokens are generated only during import
+
+    /** Reset add form fields to defaults. */
+    protected function resetAddForm(): void
+    {
+        $this->a_year = $this->filterYear ?? (int) now()->year;
+        $this->a_type = 'student';
+        $this->a_identifier = '';
+        $this->a_name = '';
+        $this->a_class = null;
+        $this->a_major = null;
+        $this->a_position = null;
+        $this->a_token = null;
+    }
+
+    /** Add a single voter directly from the UI. */
+    public function addVoter(): void
+    {
+        $payload = [
+            'year' => $this->a_year,
+            'type' => $this->a_type,
+            'identifier' => trim($this->a_identifier),
+            'name' => trim($this->a_name),
+            'class' => $this->a_class ?: null,
+            'major' => $this->a_major ?: null,
+            'position' => $this->a_position ?: null,
+            'token' => $this->a_token ? trim($this->a_token) : '',
+        ];
+
+        Validator::make($payload, [
+            'year' => 'required|integer|min:2000|max:2100',
+            'type' => 'required|in:student,staff',
+            'identifier' => 'required|string|max:50',
+            'name' => 'required|string|max:200',
+            'class' => 'nullable|string|max:100',
+            'major' => 'nullable|string|max:100',
+            'position' => 'nullable|string|max:150',
+            'token' => 'nullable|string|max:50',
+        ])->validate();
+
+        // Enforce unique identifier per year
+        $exists = Voter::where('year', $payload['year'])
+            ->where('identifier', $payload['identifier'])
+            ->exists();
+        if ($exists) {
+            session()->flash('error', 'Identifier sudah digunakan untuk tahun ini.');
+            $this->dispatch('toast', message: 'Identifier sudah digunakan untuk tahun ini.', type: 'error');
+            return;
+        }
+
+        // Plain token handling: use provided or generate
+        $plainToken = $payload['token'] !== '' ? strtoupper($payload['token']) : strtoupper(Str::random(6));
+        $tokenHash = Hash::make($plainToken, ['rounds' => 6]);
+
+        $voter = Voter::create([
+            'type' => $payload['type'],
+            'identifier' => $payload['identifier'],
+            'name' => $payload['name'],
+            'class' => $payload['class'],
+            'major' => $payload['major'],
+            'position' => $payload['position'],
+            'token_hash' => $tokenHash,
+            'has_voted' => false,
+            'year' => $payload['year'],
+        ]);
+
+        // Save encrypted plain token for admin reference
+        VoterPlainToken::updateOrCreate(
+            ['voter_id' => $voter->id],
+            ['token_encrypted' => Crypt::encryptString($plainToken)]
+        );
+
+        // Track recent token in session and component state
+        $this->recentTokens[$voter->id] = $plainToken;
+        Session::put('import.generated_tokens.'.$voter->id, $plainToken);
+
+        // Reset form and optionally hide
+        $this->resetAddForm();
+        $this->showAddForm = false;
+
+        // Refresh listing to include the new voter
+        $this->resetPage();
+
+        session()->flash('success', 'Pemilih berhasil ditambahkan.');
+        $this->dispatch('toast', message: 'Pemilih berhasil ditambahkan.', type: 'success');
+    }
+
+    /** Cancel add mode and reset form. */
+    public function cancelAdd(): void
+    {
+        $this->resetAddForm();
+        $this->showAddForm = false;
+    }
 
     public function export()
     {

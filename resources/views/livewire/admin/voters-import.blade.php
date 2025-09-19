@@ -79,6 +79,86 @@
         </div>
     </flux:card>
 
+    <!-- Tambah Pemilih (Form langsung) -->
+    <flux:card class="mt-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white">Tambah Pemilih</h3>
+                <p class="text-xs text-gray-500 dark:text-zinc-400">Tambahkan satu data pemilih tanpa import CSV.</p>
+            </div>
+            <flux:button variant="primary" icon="plus" wire:click="$toggle('showAddForm')">
+                <span>{{ $showAddForm ? 'Tutup Form' : 'Tambah Pemilih' }}</span>
+            </flux:button>
+        </div>
+
+        @if ($showAddForm)
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div class="md:col-span-2">
+                <flux:input type="number" label="Tahun" wire:model.defer="a_year" placeholder="{{ now()->year }}" />
+                @error('a_year')
+                <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+            <div class="md:col-span-2">
+                <flux:select label="Tipe" wire:model="a_type">
+                    <option value="student">student</option>
+                    <option value="staff">staff</option>
+                </flux:select>
+                @error('a_type')
+                <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+            <div class="md:col-span-2">
+                <flux:input label="Identifier" wire:model.defer="a_identifier" placeholder="NIS / NIP / ID" />
+                @error('a_identifier')
+                <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+            <div class="md:col-span-3">
+                <flux:input label="Nama" wire:model.defer="a_name" />
+                @error('a_name')
+                <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+            <div class="md:col-span-3">
+                <flux:input label="Token (opsional)" wire:model.defer="a_token" placeholder="otomatis jika kosong" />
+                <p class="mt-1 text-[11px] text-gray-500 dark:text-zinc-400">Token akan dibuat otomatis jika dikosongkan.</p>
+                @error('a_token')
+                <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                @enderror
+            </div>
+
+            @if ($a_type === 'student')
+                <div class="md:col-span-2">
+                    <flux:input label="Kelas" wire:model.defer="a_class" placeholder="cth: XII PPLG" />
+                    @error('a_class')
+                    <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div class="md:col-span-2">
+                    <flux:input label="Jurusan" wire:model.defer="a_major" placeholder="cth: PPLG" />
+                    @error('a_major')
+                    <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div class="md:col-span-2"></div>
+            @else
+                <div class="md:col-span-2">
+                    <flux:input label="Jabatan" wire:model.defer="a_position" placeholder="cth: Guru" />
+                    @error('a_position')
+                    <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div class="md:col-span-4"></div>
+            @endif
+        </div>
+        <div class="mt-4 flex items-center justify-end gap-2">
+            <flux:button icon="x-mark" variant="ghost" wire:click="cancelAdd">Batal</flux:button>
+            <flux:button icon="check" wire:click="addVoter" wire:loading.attr="disabled" wire:target="addVoter">Simpan</flux:button>
+        </div>
+        @endif
+    </flux:card>
+
     <flux:card class="mt-6">
         <div class="flex items-end gap-3 flex-wrap">
             <div class="flex-1 min-w-[220px]">
@@ -145,7 +225,6 @@
                         <th class="px-4 py-3">Jabatan</th>
                         <th class="px-4 py-3">Status</th>
                         <th class="px-4 py-3">Token</th>
-                        <th class="px-4 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-zinc-700">
@@ -178,52 +257,10 @@
                                 @endif
                             </div>
                         </td>
-                        <td class="px-4 py-3">
-                            <div class="flex gap-2 justify-end">
-                                <flux:button size="xs" variant="primary" icon="pencil-square" wire:click="editVoter({{ $v->id }})">Edit</flux:button>
-                            </div>
-                        </td>
                     </tr>
-
-                    @if ($editId === $v->id)
-                    <tr class="border-t bg-zinc-50/60 dark:bg-zinc-800/30">
-                        <td colspan="12" class="p-3">
-                            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm">
-                                <div class="md:col-span-2">
-                                    <flux:select wire:model="e_type" label="Tipe">
-                                        <option value="student">student</option>
-                                        <option value="staff">staff</option>
-                                    </flux:select>
-                                    @error('type')
-                                    <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ $message }}</p>
-                                    @enderror
-                                </div>
-                                <div class="md:col-span-2">
-                                    <flux:input wire:model.defer="e_identifier" label="Identifier" class="text-sm" />
-                                </div>
-                                <div class="md:col-span-3">
-                                    <flux:input wire:model.defer="e_name" label="Nama" class="text-sm" />
-                                </div>
-                                <div class="md:col-span-1">
-                                    <flux:input wire:model.defer="e_class" label="Kelas" class="text-sm" />
-                                </div>
-                                <div class="md:col-span-2">
-                                    <flux:input wire:model.defer="e_major" label="Jurusan" class="text-sm" />
-                                </div>
-                                <div class="md:col-span-2">
-                                    <flux:input wire:model.defer="e_position" label="Jabatan" class="text-sm" />
-                                </div>
-                            </div>
-                            <div class="mt-3 flex gap-2 justify-end">
-                                <flux:button icon="check" wire:click="updateVoter">Simpan</flux:button>
-                                <flux:button icon="x-mark" wire:click="cancelEdit">Batal</flux:button>
-                            </div>
-                        </td>
-                    </tr>
-                    @endif
                     @empty
                     <tr>
-                        <td colspan="12" class="py-10 text-center">
+                        <td colspan="11" class="py-10 text-center">
                             <div class="text-sm text-gray-500 dark:text-zinc-400">
                                 Tidak ada data untuk ditampilkan.
                             </div>
